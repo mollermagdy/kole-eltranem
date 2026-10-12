@@ -1,0 +1,176 @@
+<style>
+  body {
+    font: 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 14px;
+    color: #222;
+  }
+  h3 { margin: 0 0 6px; font-size: 13px; }
+  p.hint { margin: 0 0 10px; color: #666; line-height: 1.45; }
+  .sel {
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 7px 9px;
+    margin-bottom: 10px;
+    max-height: 92px;
+    overflow: auto;
+    background: #fafafa;
+  }
+  .sel b { font-size: 11px; color: #444; display: block; margin-bottom: 3px; }
+  .sel ul { margin: 0; padding-left: 16px; }
+  .sel li { font-size: 11px; color: #555; line-height: 1.5; }
+  .sel .none { font-size: 11px; color: #999; }
+  label.opt {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: #444;
+    margin-bottom: 5px;
+    cursor: pointer;
+  }
+  button {
+    width: 100%;
+    padding: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 7px;
+  }
+  #go { background: #0D99FF; color: #fff; }
+  #go:hover { background: #0b87e0; }
+  #save { background: #14AE5C; color: #fff; display: none; }
+  #close { background: #eee; color: #333; }
+  #status {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 80px;
+    overflow: auto;
+  }
+  .err { color: #D93025 !important; }
+  .ok { color: #14AE5C !important; }
+</style>
+
+<h3>Export Layout + SVGs</h3>
+<p class="hint">Select one or more <b>frames</b> and press Export. Captures
+geometry, clipping/overflow, colours, text, auto-layout, components, variables
+and the SVG art.</p>
+
+<div class="sel" id="sel"><span class="none">Nothing selected.</span></div>
+
+<label class="opt"><input type="checkbox" id="vars" checked> Include local variables (all modes)</label>
+<label class="opt"><input type="checkbox" id="styles" checked> Include shared styles</label>
+<label class="opt"><input type="checkbox" id="flatten"> Flatten each frame to ONE svg
+  <span style="color:#999">(off = split into layers)</span></label>
+<label class="opt"><input type="checkbox" id="framesart"> Frames = one SVG each
+  <span style="color:#999">(groups stay containers)</span></label>
+<label class="opt"><input type="checkbox" id="assets"> Export PNGs + all assets
+  <span style="color:#999">(@2x PNGs, image fills, frame previews)</span></label>
+
+<button id="go">Export selection</button>
+<button id="save">💾 Save JSON file</button>
+<button id="close">Close</button>
+<div id="status"></div>
+
+<script>
+  var statusEl = document.getElementById('status');
+  var selEl = document.getElementById('sel');
+  var saveBtn = document.getElementById('save');
+  var payload = null;
+  var fileLabel = 'export';
+
+  function setStatus(msg, cls) {
+    statusEl.textContent = msg;
+    statusEl.className = cls || '';
+  }
+
+  function renderSelection(list) {
+    if (!list || !list.length) {
+      selEl.innerHTML = '<span class="none">Nothing selected.</span>';
+      return;
+    }
+    var html = '<b>' + list.length + ' selected</b><ul>';
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      var name = String(n.name).replace(/[<>&]/g, '');
+      html += '<li>' + name + ' <span style="color:#999">(' + n.type + ')</span></li>';
+    }
+    selEl.innerHTML = html + '</ul>';
+  }
+
+  document.getElementById('go').onclick = function () {
+    setStatus('Exporting…');
+    saveBtn.style.display = 'none';
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: 'export',
+          opts: {
+            includeVariables: document.getElementById('vars').checked,
+            includeStyles: document.getElementById('styles').checked,
+            flattenLeaves: document.getElementById('flatten').checked,
+            framesAreArt: document.getElementById('framesart').checked,
+            exportAssets: document.getElementById('assets').checked,
+          },
+        },
+      },
+      '*'
+    );
+  };
+
+  document.getElementById('close').onclick = function () {
+    parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+  };
+
+  saveBtn.onclick = function () {
+    if (!payload) return;
+    var blob = new Blob([payload], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'figma-' + fileLabel.replace(/[^a-zA-Z0-9_-]+/g, '-') + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setStatus('Saved. Move it into design-source/ in your project.', 'ok');
+  };
+
+  onmessage = function (e) {
+    var msg = e.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.selection) {
+      renderSelection(msg.selection);
+      return;
+    }
+    if (msg.error) {
+      setStatus('⚠ ' + msg.error, 'err');
+      return;
+    }
+    if (msg.progress) {
+      setStatus(msg.progress);
+      return;
+    }
+    if (msg.done) {
+      payload = msg.json;
+      fileLabel =
+        msg.frameCount === 1 && msg.frameNames && msg.frameNames[0]
+          ? msg.frameNames[0]
+          : msg.frameCount + '-frames';
+      var kb = Math.round(msg.json.length / 1024);
+      setStatus(
+        '✓ ' + msg.frameCount + ' frame(s), ' + msg.svgCount + ' SVGs, ' +
+          (msg.pngCount ? msg.pngCount + ' PNGs/images, ' : '') + kb + ' KB.\nClick Save below.',
+        'ok'
+      );
+      saveBtn.style.display = 'block';
+    }
+  };
+
+  // Ask for the current selection as soon as the UI opens.
+  parent.postMessage({ pluginMessage: { type: 'selectionInfo' } }, '*');
+</script>

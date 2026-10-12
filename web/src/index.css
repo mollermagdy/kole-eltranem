@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+@import 'lenis/dist/lenis.css';
+
+/* Design tokens extracted from the Figma export (figma-Home-Screen.json) */
+@theme {
+  --font-sans: 'Tajawal', system-ui, sans-serif;
+  --font-naskh: 'Geeza Pro', 'Noto Naskh Arabic', serif;
+
+  --color-ink: #1a1320;
+  --color-muted: #6b6472;
+  --color-line: #ebe8ef;
+  --color-surface: #fbfafc;
+  --color-paper: #d8dde8;
+
+  --color-navy: #1c2663;
+  --color-night: #212c3e;
+
+  --color-story: #e9724a;
+  --color-story-soft: #fb8b65;
+  --color-melody: #fabe3a;
+  --color-lyrics: #575fcc;
+  --color-lyrics-sky: #5187e6;
+  --color-mint: #8ed8b5;
+  --color-teal: #56bab7;
+
+  --color-rose: #d81b60;
+  --color-emerald: #00a06a;
+  --color-violet: #6b4de6;
+
+  --shadow-card: 0 1px 2px rgb(26 19 32 / 0.04), 0 8px 24px -8px rgb(26 19 32 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(26 19 32 / 0.06), 0 24px 48px -16px rgb(26 19 32 / 0.25);
+}
+
+@layer base {
+  body {
+    @apply text-ink bg-white font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-navy text-white;
+  }
+  :focus-visible {
+    @apply outline-navy outline-2 outline-offset-2;
+  }
+}
+
+/* Calligraphy PNGs are used as masks so they can take any color */
+@utility calligraphy {
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  mask-position: center;
+}
